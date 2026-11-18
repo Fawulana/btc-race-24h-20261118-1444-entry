@@ -14,7 +14,7 @@
 //     trailing EXIT_N-bar mean, or TAKE_BPS above the entry close (locks a
 //     windfall before the mean exit can give it back), or STOP_BPS below the
 //     entry close (caps the damage when the dip keeps dipping). The exit mean
-//     is faster than the entry mean on purpose: the 120-bar mean is still
+//     is faster than the entry mean on purpose: the 135-bar mean is still
 //     dragged down by the dip itself when the recovery starts, so exiting
 //     against it would cut the trade short; the 60-bar mean follows the
 //     recovery up and lets it run further.
@@ -28,31 +28,41 @@
 // batch.
 //
 // Measured on the dev window with the kit's grade-local driver (see README):
-// net PnL +$15.66 over 4 trades (2 round trips), max drawdown 0.76%.
+// net PnL +$18.19 over 4 trades (2 round trips), max drawdown 0.65%.
 // Honest caveat: the dev window holds only two round trips, so every
 // parameter effect is one-trade granularity and this family is knife-edge by
 // construction on any single window. What was checked before choosing these
-// numbers: the same bot on the two previous btc-race dev windows (+$2.85 on
-// the range-bound 20261117 window, -$44.67 on the steep -4.00% downtrend
+// numbers: the same bot on the two previous btc-race dev windows (+$7.04 on
+// the range-bound 20261117 window, -$33.59 on the steep -4.00% downtrend
 // 20261115 window — a dip buyer loses when the market falls all day and never
-// bounces), and the neighbourhood on this window (REF_N 105-150 all positive
-// at +$7.14 to +$15.21; EXIT_N 45-90 and EXIT_BPS 80-100 all +$15.66;
-// STOP 100-250 all +$15.66). Trend filters were tried and rejected: requiring
-// the close above the 360-bar mean, or the 120-bar mean rising, blocks every
-// trade on this window — the profitable legs ARE bounces inside a downtrend,
-// so a filter that only buys uptrends buys nothing. Rejected variants:
-// Bollinger/volatility-scaled entry, ladder scale-in, trailing exits, 2-bar
-// confirmation, partial exits, rolling-high entry (all worse or zero trades
-// on this window).
+// bounces), and the neighbourhood on this window (a 1,728-combo joint grid:
+// REF_N 120-135, DIP 70-75, TAKE 90-110, EXIT_BPS 80-120, EXIT_N 30-120,
+// STOP 100-250 all +$13.98 to +$18.19 — a plateau, not a single point; but
+// REF_N 150, DIP 65 and TAKE 120 each collapse the dev result, so the plateau
+// has cliffs on both sides and the numbers are still one-trade granularity).
+// Both legs are positive and both halves of the window are positive
+// (+$11.88 first half, +$6.31 second half, mark-to-market). Trend filters
+// were tried and rejected: requiring the close above the 360-bar mean, or the
+// 120-bar mean rising, blocks every trade on this window — the profitable legs
+// ARE bounces inside a downtrend, so a filter that only buys uptrends buys
+// nothing. Tuning round 1 also tried and rejected: EMA reference/exit means
+// (dev +$10.02 / +$18.19, worse or inert), entry on the bar low and exit on
+// the bar high (dev unchanged, worse on the other windows), trailing stops
+// 30/50/80/120 bps (churn: 6 trades on dev, catastrophic on the downtrend
+// window, -$215 at 30 bps), hold caps 120/180/240 (all worse on dev; 360
+// inert), re-entry cooldowns 30/60/120 (inert on dev, worse on the downtrend
+// window). Rejected variants from v1: Bollinger/volatility-scaled entry,
+// ladder scale-in, 2-bar confirmation, partial exits, rolling-high entry (all
+// worse or zero trades on this window).
 
 import { BPS, runBars, type BarsState, type BuyInput, type SellInput } from './vendor/makefun-bars.ts';
 
 // --- strategy constants (swept against the dev window; see header) ---
-const REF_N = 120; // trailing mean of closes for entries, in bars (excludes the current bar)
+const REF_N = 135; // trailing mean of closes for entries, in bars (excludes the current bar)
 const EXIT_N = 60; // trailing mean of closes for exits, in bars (excludes the current bar)
 const DIP_BPS = 70; // entry: close this far below the trailing REF_N mean
-const EXIT_BPS = 80; // exit: close this far above the trailing EXIT_N mean
-const TAKE_BPS = 100; // exit: this far above the entry close (windfall lock)
+const EXIT_BPS = 100; // exit: close this far above the trailing EXIT_N mean
+const TAKE_BPS = 110; // exit: this far above the entry close (windfall lock)
 const STOP_BPS = 150; // exit: this far below the entry close
 const END_CUTOFF = 30; // no new entries in the final N bars of the window
 const MAX_SLIPPAGE_BPS = 100; // 1% past the close the order was decided on
